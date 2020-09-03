@@ -1,7 +1,7 @@
-# Cargo dependency checker for [clearlydefined.io](clearlydefined.io)
+# Cargo dependency checker for [clearlydefined.io](https://clearlydefined.io)
 
 This is small extension to `cargo`, to check your dependency tree against the database of
-[clearlydefined.io](clearlydefined.io).
+[clearlydefined.io](https://clearlydefined.io).
 
 > ClearlyDefined and our parent organization, the Open Source Initiative, are on a mission to help FOSS projects thrive by being, well, clearly defined. 
 
