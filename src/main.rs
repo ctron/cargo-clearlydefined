@@ -71,7 +71,7 @@ async fn main() -> Result<(), Error> {
     let deps = lockfile
         .packages
         .iter()
-        .filter(|&dep| exclude.contains(&dep.name.to_string()))
+        .filter(|&dep| !exclude.contains(&dep.name.to_string()))
         .map(|p| {
             Ok(Dependency {
                 name: p.name.to_string(),
