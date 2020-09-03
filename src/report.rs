@@ -66,15 +66,23 @@ fn clearly_link(dep: &Dependency) -> String {
     )
 }
 
+fn shield_escape(input: &String) -> String {
+    input.replace('-', "--").replace('_', "__")
+}
+
 fn shield(dep: &Dependency, score: &String) -> String {
     let passed = match dep.passed {
         true => "success",
         false => "critical",
     };
+
+    let name = shield_escape(&dep.name);
+    let version = shield_escape(&dep.version.to_string());
+
     format!(
         "https://img.shields.io/badge/{name}_{version}-{score}-{passed}",
-        name = dep.name,
-        version = dep.version,
+        name = name,
+        version = version,
         score = score,
         passed = passed,
     )
