@@ -1,4 +1,7 @@
-# Cargo dependency checker using [clearlydefined.io](https://clearlydefined.io)
+# cargo-clearlydefined - <small>Cargo dependency checker using [clearlydefined.io](https://clearlydefined.io)</small>
+
+[![Build Status](https://github.com/ctron/cargo-clearlydefined/workflows/CI/badge.svg)](https://github.com/ctron/cargo-clearlydefined/actions?workflow=CI)
+[![Crates.io](https://img.shields.io/crates/v/cargo-clearlydefined.svg)](https://crates.io/crates/cargo-clearlydefined)
 
 This is small extension to `cargo`, to check your dependency tree against the database of
 [clearlydefined.io](https://clearlydefined.io).
