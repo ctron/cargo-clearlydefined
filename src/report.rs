@@ -11,52 +11,27 @@
  * SPDX-License-Identifier: EPL-2.0
  */
 
-use crate::args::OutputFormat;
+use crate::args::{Args, OutputFormat};
+use crate::data::{Dependency, Outcome};
+
 use anyhow::Result;
+
+use std::io;
+
 use prettytable;
 use prettytable::csv::Writer;
 use prettytable::format::{self, FormatBuilder};
 use prettytable::{Cell, Row, Table};
-use semver::Version;
-use std::cmp::Ordering;
-use std::io;
 
-#[derive(Debug, Clone)]
-pub struct Dependency {
-    pub name: String,
-    pub version: Version,
-
-    pub clearly_defined: Option<ClearlyDefined>,
-    pub passed: bool,
-}
-
-#[derive(Debug, Clone)]
-pub struct ClearlyDefined {
-    pub declared_license: Option<String>,
-    pub score: u64,
-}
-
-impl Eq for Dependency {}
-
-impl Ord for Dependency {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.name
-            .cmp(&other.name)
-            .then_with(|| self.version.cmp(&other.version))
-    }
-}
-
-impl PartialEq for Dependency {
-    fn eq(&self, other: &Self) -> bool {
-        self.name.eq(&other.name) && self.version.eq(&other.version)
-    }
-}
-
-impl PartialOrd for Dependency {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
+const ERR_PREFIX: &str = "ERR: ";
+#[cfg(any(not(windows), not(feature = "win_crlf")))]
+const NEWLINE: &str = "\n";
+#[cfg(any(not(windows), not(feature = "win_crlf")))]
+const ERR_PREFIX_NEWLINE: &str = "\nERR: ";
+#[cfg(all(windows, feature = "win_crlf"))]
+const NEWLINE: &str = "\r\n";
+#[cfg(all(windows, feature = "win_crlf"))]
+const ERR_PREFIX_NEWLINE: &str = "\r\nERR: ";
 
 fn clearly_link(dep: &Dependency) -> String {
     format!(
@@ -70,10 +45,11 @@ fn shield_escape(input: &String) -> String {
     input.replace('-', "--").replace('_', "__")
 }
 
-fn shield(dep: &Dependency, score: &String) -> String {
-    let passed = match dep.passed {
-        true => "success",
-        false => "critical",
+fn shield_score(dep: &Dependency, score: &String) -> String {
+    let passed = match dep.passed_score {
+        Outcome::Pass => "success",
+        Outcome::Fail => "critical",
+        Outcome::Ignore => "inactive",
     };
 
     let name = shield_escape(&dep.name);
@@ -97,10 +73,41 @@ fn markdown_image_link(img: &String, link: &String, alt: &String) -> String {
     )
 }
 
+fn format_error<E>(format: OutputFormat, err: E) -> String
+where
+    E: ToString,
+{
+    match format {
+        OutputFormat::Text => {
+            let s = format!("{}{}", ERR_PREFIX, err.to_string());
+            s.replace(NEWLINE, ERR_PREFIX_NEWLINE)
+        }
+        OutputFormat::Markdown => format!("<b>ERR:</b> <i>{}</i>", err.to_string()),
+        OutputFormat::CSV => format!("ERR: {}", err.to_string()),
+    }
+}
+
+fn emoji(outcome: Outcome) -> &'static str {
+    match outcome {
+        Outcome::Pass => "✅",
+        Outcome::Fail => "❌",
+        Outcome::Ignore => "🙈",
+    }
+}
+
+fn csv(outcome: Outcome) -> &'static str {
+    match outcome {
+        Outcome::Pass => "+",
+        Outcome::Fail => "-",
+        Outcome::Ignore => "",
+    }
+}
+
 pub fn show(
     format: OutputFormat,
-    link: bool,
-    show_passed: bool,
+    args: &Args,
+    show_score_check: bool,
+    show_license_check: bool,
     dependencies: &Vec<Dependency>,
 ) -> Result<()> {
     let mut table = Table::new();
@@ -109,60 +116,100 @@ pub fn show(
         Cell::new("Name"),
         Cell::new("Version"),
         Cell::new("Declared license"),
-        Cell::new("Score"),
     ];
 
-    match (&format, show_passed) {
-        (OutputFormat::CSV, true) => titles.push(Cell::new("Check")),
+    if show_license_check {
+        titles.push(Cell::new("License"))
+    }
+
+    titles.push(Cell::new("Score"));
+
+    match (&format, show_score_check) {
+        (OutputFormat::CSV, true) => titles.push(Cell::new("Score check")),
         _ => {}
     }
 
+    // set title
+
     table.set_titles(Row::new(titles));
 
+    // start iterating
+
+    let lax = args.lax;
+    let link = args.link;
+
     for dep in dependencies {
-        let (license, score) = dep
+        let (license_str, score) = dep
             .clearly_defined
             .as_ref()
             .map(|cd| {
-                (
-                    cd.declared_license
-                        .as_ref()
-                        .map(|s| s.clone())
-                        .unwrap_or_default(),
-                    format!("{}", cd.score),
-                )
+                let score = format!("{}", cd.score);
+
+                let l = cd
+                    .declared_license
+                    .as_ref()
+                    .map(|l| l.expression(lax))
+                    .transpose();
+
+                match l {
+                    Ok(Some(license)) => (license.to_string(), score),
+                    Err(parse_err) => (format_error(format, parse_err), score),
+                    _ => ("".into(), score),
+                }
             })
             .unwrap_or(("".into(), "".into()));
 
-        let score = match (&format, link, show_passed, dep.passed) {
+        let score = match (&format, link, show_score_check, dep.passed_score) {
             (OutputFormat::Markdown, true, false, _) => {
                 format!("[{}]({})", score, clearly_link(dep),)
             }
-
             (OutputFormat::Markdown, true, true, _) => {
-                markdown_image_link(&shield(dep, &score), &clearly_link(dep), &score)
+                markdown_image_link(&shield_score(dep, &score), &clearly_link(dep), &score)
             }
+            (OutputFormat::Markdown, _, true, outcome) => format!("{} {}", emoji(outcome), score),
+            (OutputFormat::Text, _, true, outcome) => format!("{} {}", emoji(outcome), score),
 
-            (OutputFormat::Text, _, true, true) => format!("{} ✅", score),
-            (OutputFormat::Text, _, true, false) => format!("{} ❌", score),
+            // all other variant only show the score
             _ => score,
         };
+
+        // default rows
 
         let mut row = vec![
             Cell::new(&dep.name),
             Cell::new(&dep.version.to_string()),
-            Cell::new(&license),
-            Cell::new(&score),
+            Cell::new(&license_str),
         ];
 
-        match (&format, show_passed, dep.passed) {
-            (OutputFormat::CSV, true, true) => row.push(Cell::new("+")),
-            (OutputFormat::CSV, true, false) => row.push(Cell::new("-")),
+        // license test column
+
+        if show_license_check {
+            match (&format, dep.passed_license) {
+                (OutputFormat::CSV, outcome) => Some(csv(outcome)),
+                (OutputFormat::Text, outcome) => Some(emoji(outcome)),
+                (OutputFormat::Markdown, outcome) => Some(emoji(outcome)),
+            }
+            .map(|text| Cell::new(text))
+            .map(|cell| row.push(cell));
+        }
+
+        // add score
+
+        row.push(Cell::new(&score));
+
+        // add test column
+
+        match (&format, show_score_check, dep.passed_score) {
+            (OutputFormat::CSV, true, outcome) => row.push(Cell::new(csv(outcome))),
             _ => {}
         }
 
+        // add row
+
         table.add_row(Row::new(row));
     }
+
+    // print result
 
     match format {
         OutputFormat::CSV => {
@@ -171,7 +218,6 @@ pub fn show(
         OutputFormat::Text => {
             table.set_format(*prettytable::format::consts::FORMAT_NO_LINESEP_WITH_TITLE);
             table.printstd();
-            println!("{} dependencies processed", dependencies.len());
         }
         OutputFormat::Markdown => {
             let format = FormatBuilder::new()

@@ -13,6 +13,7 @@
 
 mod args;
 mod cd;
+mod data;
 mod report;
 
 use std::env;
@@ -25,11 +26,11 @@ use log::LevelFilter;
 use structopt::StructOpt;
 
 use crate::args::Opts;
-use crate::report::Dependency;
+use crate::data::{ApprovedLicenses, Dependency, LicenseCheck, OsiApproved, Outcome};
 use simplelog::{Config, TermLogger, TerminalMode};
 use tokio::stream::StreamExt;
 
-use anyhow::anyhow;
+use anyhow::{anyhow, Result};
 
 fn default_dir() -> Option<PathBuf> {
     env::var_os("CARGO_MANIFEST_DIR").map(|s| PathBuf::from(&s))
@@ -58,6 +59,8 @@ async fn main() -> Result<(), Error> {
     let cwd = env::current_dir()?;
     let input = args
         .input
+        .as_ref()
+        .cloned()
         .unwrap_or_else(|| default_dir().unwrap_or(cwd).join(Path::new("Cargo.lock")));
 
     log::info!("Loading from: {}", &input.to_str().unwrap_or_default());
@@ -66,7 +69,7 @@ async fn main() -> Result<(), Error> {
 
     log::info!("Loaded {} dependencies", lockfile.packages.len());
 
-    let exclude = args.exclude;
+    let exclude = &args.exclude;
 
     let deps = lockfile
         .packages
@@ -77,7 +80,8 @@ async fn main() -> Result<(), Error> {
                 name: p.name.to_string(),
                 version: p.version.clone(),
                 clearly_defined: None,
-                passed: false,
+                passed_license: Outcome::Ignore,
+                passed_score: Outcome::Ignore,
             })
         })
         .collect::<Vec<_>>();
@@ -100,34 +104,53 @@ async fn main() -> Result<(), Error> {
 
     log::info!("Processed all dependencies");
 
-    let ignore = args.ignore;
+    let ignore = &args.ignore;
     let required_score = args.score;
+
+    let mut checks: Vec<Box<dyn LicenseCheck>> = Vec::new();
+    if args.approve_osi {
+        checks.push(Box::new(OsiApproved));
+    }
+    if !args.approved_licenses.is_empty() {
+        checks.push(Box::new(ApprovedLicenses {
+            licenses: args.approved_licenses.iter().map(|name| name.0).collect(),
+        }))
+    }
+
+    let has_license_checks = !checks.is_empty();
+    let approve_all = args.approve_all;
+    let has_score_check = args.score > 0;
 
     deps = deps
         .iter()
-        .filter(|dep| !ignore.contains(&dep.name))
         .map(|dep| {
             let mut dep = dep.clone();
 
             let score = dep.clearly_defined.as_ref().map(|cd| cd.score).unwrap_or(0);
 
-            dep.passed = ignore.contains(&dep.name) || score >= required_score;
+            if !ignore.contains(&dep.name) {
+                // check score
+                dep.passed_score = (score >= required_score).into();
+                // check license
+                if !has_license_checks {
+                    dep.passed_license = Outcome::Fail;
+                } else if approve_all {
+                    dep.passed_license = Outcome::Pass;
+                } else {
+                    dep.passed_license = dep.test_license(args.lax, &checks).is_ok().into();
+                }
+            }
 
             dep
         })
         .collect();
 
-    // now sort it
-
-    if !args.quiet {
+    if !&args.quiet {
+        // now sort it
         deps.sort();
 
-        if !args.all {
-            let failed_deps: Vec<_> = deps
-                .iter()
-                .filter(|dep| !dep.passed)
-                .map(|dep| dep.clone())
-                .collect();
+        if args.failed {
+            let failed_deps: Vec<_> = deps.iter().filter(|dep| !dep.passed()).cloned().collect();
 
             log::info!(
                 "{} dependencies are below the required score of {}",
@@ -135,15 +158,35 @@ async fn main() -> Result<(), Error> {
                 required_score
             );
 
-            report::show(args.output_format, args.link, false, &failed_deps)?;
+            report::show(
+                args.output_format,
+                &args,
+                has_score_check,
+                !approve_all,
+                &failed_deps,
+            )?;
         } else {
-            report::show(args.output_format, args.link, args.all, &deps)?;
+            report::show(
+                args.output_format,
+                &args,
+                has_score_check,
+                !approve_all,
+                &deps,
+            )?;
         }
     }
 
-    let failed = deps.iter().filter(|&d| !d.passed).count();
+    if !args.quiet && !has_license_checks {
+        eprintln!("You have no license checks. Try --approve-osi, --approve-all, or provide a manual selection using e.g. --approve <spdx-license>");
+    }
+
+    let failed = deps.iter().filter(|&d| !d.passed()).count();
     match failed {
         0 => Ok(()),
-        _ => Err(anyhow!("{} dependencies failed the score test", failed)),
+        _ => Err(anyhow!(
+            "{} dependencies out of {} failed at least one of the tests",
+            failed,
+            deps.len()
+        )),
     }
 }

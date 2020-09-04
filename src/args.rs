@@ -15,6 +15,8 @@ use std::path::PathBuf;
 use structopt::clap::AppSettings;
 use structopt::StructOpt;
 
+use anyhow::anyhow;
+
 #[derive(StructOpt)]
 #[structopt(bin_name = "cargo")]
 pub enum Opts {
@@ -28,9 +30,11 @@ pub enum Opts {
 }
 
 use clap::arg_enum;
+use spdx::LicenseId;
+use std::str::FromStr;
 
 arg_enum! {
-    #[derive(Debug)]
+    #[derive(Debug, Clone, Copy)]
     pub enum OutputFormat {
         Text,
         CSV,
@@ -46,12 +50,12 @@ pub struct Args {
     /// Verbose mode, repeat to increase verbosity.
     #[structopt(short, long, parse(from_occurrences))]
     pub verbose: u8,
-    /// The score requires to pass the test.
+    /// The score required to pass the test.
     #[structopt(short, long, default_value = "80")]
     pub score: u64,
-    /// Show all dependencies, failed or not.
-    #[structopt(short = "a", long)]
-    pub all: bool,
+    /// Show only failed dependencies.
+    #[structopt(short = "f", long)]
+    pub failed: bool,
     /// List the dependencies to exclude completely.
     #[structopt(short = "x", long)]
     pub exclude: Vec<String>,
@@ -67,4 +71,29 @@ pub struct Args {
     /// Don't show any results.
     #[structopt(short, long)]
     pub quiet: bool,
+    /// Lax parsing of SPDX expressions.
+    #[structopt(long)]
+    pub lax: bool,
+    /// Approve all licenses
+    #[structopt(long = "approve-all")]
+    pub approve_all: bool,
+    /// Pass if a dependency has at least one OSI approved license.
+    #[structopt(long = "approve-osi")]
+    pub approve_osi: bool,
+    /// Pass if a dependency has at least one of the approved licenses (can be used multiple times).
+    #[structopt(short = "L", long = "approve")]
+    pub approved_licenses: Vec<LicenseName>,
+}
+
+pub struct LicenseName(pub(crate) LicenseId);
+
+impl FromStr for LicenseName {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match spdx::license_id(s) {
+            Some(id) => Ok(LicenseName(id)),
+            None => Err(anyhow!("Unknown license: {}", s)),
+        }
+    }
 }

@@ -11,7 +11,7 @@
  * SPDX-License-Identifier: EPL-2.0
  */
 
-use crate::report::{ClearlyDefined, Dependency};
+use crate::data::{ClearlyDefined, Dependency, License};
 
 use anyhow::Result;
 use reqwest::Client;
@@ -27,8 +27,13 @@ pub async fn lookup_clearlydefined(
 
     let def: serde_json::Value = client.get(&url).send().await?.json().await?;
 
+    let license = def["licensed"]["declared"]
+        .as_str()
+        .map(|s| License::new(s.into()))
+        .transpose()?;
+
     dependency.clearly_defined = Some(ClearlyDefined {
-        declared_license: def["licensed"]["declared"].as_str().map(|s| s.to_string()),
+        declared_license: license,
         score: def["scores"]["effective"].as_u64().unwrap_or(0),
     });
 
