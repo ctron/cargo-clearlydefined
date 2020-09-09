@@ -161,13 +161,16 @@ pub fn show(
 
         let score = match (&format, link, show_score_check, dep.passed_score) {
             (OutputFormat::Markdown, true, false, _) => {
-                format!("[{}]({})", score, clearly_link(dep),)
+                format!("[{}]({})", score, clearly_link(dep))
             }
             (OutputFormat::Markdown, true, true, _) => {
                 markdown_image_link(&shield_score(dep, &score), &clearly_link(dep), &score)
             }
             (OutputFormat::Markdown, _, true, outcome) => format!("{} {}", emoji(outcome), score),
-            (OutputFormat::Text, _, true, outcome) => format!("{} {}", emoji(outcome), score),
+            (OutputFormat::Text, false, true, outcome) => format!("{} {}", emoji(outcome), score),
+            (OutputFormat::Text, true, true, outcome) => {
+                format!("{} {} ({})", emoji(outcome), score, clearly_link(dep))
+            }
 
             // all other variant only show the score
             _ => score,

@@ -72,12 +72,12 @@ You can choose the score to test using `-t`. Testing for the "licensed score" wo
 
     cargo clearlydefined --score 50 -t licensed
 
-## Showing all dependencies
+## Adding a link
 
-By default, only the "failed" dependencies are shown. You can however get a report of all
-dependencies:
+It is also possible to provide the argument `--link`, which will add a link to the definition page
+at [clearlydefined.io](https://clearlydefined.io]). Not all output formats support this though.
 
-    cargo clearlydefined --all
+    cargo clearlydefined --link
 
 ## Ignoring & Excluding
 
@@ -179,9 +179,6 @@ To get a nice markdown result, use:
 
 This will create a markdown table, including a badge, that shows the outcome of the test, if you choose to
 display all dependencies.
-
-It is also possible to provide the argument `--link`, which will always add a link to clearlydefined.io
-in the score column.
 
 Example output:
 
