@@ -85,8 +85,8 @@ impl License {
 
     pub fn expression(&self, lax: bool) -> Result<Expression> {
         let mode = match lax {
-            true => ParseMode::Lax,
-            false => ParseMode::Strict,
+            true => ParseMode::LAX,
+            false => ParseMode::STRICT,
         };
 
         match Expression::parse_mode(&self.raw, mode) {
@@ -128,7 +128,7 @@ pub struct OsiApproved;
 impl LicenseCheck for OsiApproved {
     fn check(&self, expression: &Expression) -> Result<()> {
         let r = expression.evaluate(|r| match r.license {
-            LicenseItem::SPDX { id, .. } => id.is_osi_approved(),
+            LicenseItem::Spdx { id, .. } => id.is_osi_approved(),
             _ => false,
         });
 
@@ -147,7 +147,7 @@ pub struct ApprovedLicenses {
 impl LicenseCheck for ApprovedLicenses {
     fn check(&self, expression: &Expression) -> Result<()> {
         let r = expression.evaluate(|r| match r.license {
-            LicenseItem::SPDX { id, .. } => self.licenses.contains(&id),
+            LicenseItem::Spdx { id, .. } => self.licenses.contains(&id),
             _ => false,
         });
 

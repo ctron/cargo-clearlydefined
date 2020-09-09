@@ -16,21 +16,19 @@ mod cd;
 mod data;
 mod report;
 
-use std::env;
-use std::path::{Path, PathBuf};
-
-use anyhow::Error;
-use cargo_lock::lockfile::Lockfile;
-use futures::{stream, TryStreamExt};
-use log::LevelFilter;
-use structopt::StructOpt;
-
 use crate::args::Opts;
 use crate::data::{ApprovedLicenses, Dependency, LicenseCheck, OsiApproved, Outcome};
-use simplelog::{Config, TermLogger, TerminalMode};
-use tokio::stream::StreamExt;
-
-use anyhow::{anyhow, Result};
+use anyhow::Error;
+use anyhow::Result;
+use cargo_lock::Lockfile;
+use futures::StreamExt;
+use futures::{stream, TryStreamExt};
+use log::LevelFilter;
+use simplelog::{ColorChoice, Config, TermLogger, TerminalMode};
+use std::env;
+use std::path::{Path, PathBuf};
+use std::process::ExitCode;
+use structopt::StructOpt;
 
 fn default_dir() -> Option<PathBuf> {
     env::var_os("CARGO_MANIFEST_DIR").map(|s| PathBuf::from(&s))
@@ -47,13 +45,14 @@ fn verbosity(num: u8) -> LevelFilter {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Error> {
+async fn main() -> Result<ExitCode, Error> {
     let Opts::ClearlyDefined(args) = Opts::from_args();
 
     TermLogger::init(
         verbosity(args.verbose),
         Config::default(),
         TerminalMode::Stderr,
+        ColorChoice::Auto,
     )?;
 
     let cwd = env::current_dir()?;
@@ -186,11 +185,14 @@ async fn main() -> Result<(), Error> {
 
     let failed = deps.iter().filter(|&d| !d.passed()).count();
     match failed {
-        0 => Ok(()),
-        _ => Err(anyhow!(
-            "{} dependencies out of {} failed at least one of the tests",
-            failed,
-            deps.len()
-        )),
+        0 => Ok(ExitCode::SUCCESS),
+        _ => {
+            log::error!(
+                "{} dependencies out of {} failed at least one of the tests",
+                failed,
+                deps.len()
+            );
+            Ok(ExitCode::FAILURE)
+        }
     }
 }
