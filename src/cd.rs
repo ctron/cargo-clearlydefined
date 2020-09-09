@@ -32,10 +32,11 @@ pub async fn lookup_clearlydefined(
         .map(|s| License::new(s.into()))
         .transpose()?;
 
-    dependency.clearly_defined = Some(ClearlyDefined {
-        declared_license: license,
-        score: def["scores"]["effective"].as_u64().unwrap_or(0),
-    });
+    dependency.clearly_defined = Some(ClearlyDefined::new(
+        license,
+        def["scores"]["effective"].as_u64().unwrap_or(0),
+        def["licensed"]["score"]["total"].as_u64().unwrap_or(0),
+    ));
 
     Ok(dependency.clone())
 }

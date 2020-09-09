@@ -126,7 +126,11 @@ async fn main() -> Result<(), Error> {
         .map(|dep| {
             let mut dep = dep.clone();
 
-            let score = dep.clearly_defined.as_ref().map(|cd| cd.score).unwrap_or(0);
+            let score = dep
+                .clearly_defined
+                .as_ref()
+                .map(|cd| cd.score(args.score_type))
+                .unwrap_or(0);
 
             if !ignore.contains(&dep.name) {
                 // check score

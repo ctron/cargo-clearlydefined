@@ -42,6 +42,14 @@ arg_enum! {
     }
 }
 
+arg_enum! {
+    #[derive(Debug, Clone, Copy)]
+    pub enum ScoreType {
+        Effective,
+        Licensed,
+    }
+}
+
 #[derive(StructOpt)]
 pub struct Args {
     /// Override the location of the input file (`Cargo.lock`)
@@ -53,6 +61,9 @@ pub struct Args {
     /// The score required to pass the test.
     #[structopt(short, long, default_value = "80")]
     pub score: u64,
+    /// Which score to test.
+    #[structopt(short = "t", long, possible_values = &ScoreType::variants(), case_insensitive = true, default_value="effective")]
+    pub score_type: ScoreType,
     /// Show only failed dependencies.
     #[structopt(short = "f", long)]
     pub failed: bool,

@@ -13,6 +13,7 @@
 
 use anyhow::{anyhow, Result};
 
+use crate::args::ScoreType;
 use semver::Version;
 use spdx::{Expression, LicenseId, LicenseItem, ParseMode};
 use std::cmp::Ordering;
@@ -47,7 +48,29 @@ pub struct Dependency {
 #[derive(Debug, Clone)]
 pub struct ClearlyDefined {
     pub declared_license: Option<License>,
-    pub score: u64,
+    effective_score: u64,
+    licensed_score: u64,
+}
+
+impl ClearlyDefined {
+    pub fn new(
+        declared_license: Option<License>,
+        effective_score: u64,
+        licensed_score: u64,
+    ) -> Self {
+        ClearlyDefined {
+            declared_license,
+            effective_score,
+            licensed_score,
+        }
+    }
+
+    pub fn score(&self, score_type: ScoreType) -> u64 {
+        match score_type {
+            ScoreType::Effective => self.effective_score,
+            ScoreType::Licensed => self.licensed_score,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

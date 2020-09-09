@@ -143,7 +143,7 @@ pub fn show(
             .clearly_defined
             .as_ref()
             .map(|cd| {
-                let score = format!("{}", cd.score);
+                let score = format!("{}", cd.score(args.score_type));
 
                 let l = cd
                     .declared_license

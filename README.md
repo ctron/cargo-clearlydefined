@@ -29,7 +29,7 @@ To get some command line help, run:
 Which should print out:
 
 ~~~
-cargo-clearlydefined 0.2.0
+cargo-clearlydefined 0.2.1
 
 USAGE:
     cargo clearlydefined [OPTIONS]
@@ -38,6 +38,8 @@ OPTIONS:
     -i, --input <input>                     Override the location of the input file (`Cargo.lock`)
     -v, --verbose                           Verbose mode, repeat to increase verbosity
     -s, --score <score>                     The score required to pass the test [default: 80]
+    -t, --score-type <score-type>           Which score to test [default: effective]  [possible values: Effective,
+                                            Licensed]
     -f, --failed                            Show only failed dependencies
     -x, --exclude <exclude>...              List the dependencies to exclude completely
     -n, --ignore <ignore>...                List the dependencies to ignore when testing
@@ -59,7 +61,16 @@ The default target score is 80, but you can change that:
 
     cargo clearlydefined --score 50
 
-It is also possible to lower the score to `0`.
+It is also possible to lower the score to `0`, which effectively disables this test.
+
+## Score type to test
+
+Clearlydefined provides different types of scores. By default, the tool will check of the "effective", or "overall"
+score.
+
+You can choose the score to test using `-t`. Testing for the "licensed score" would require:
+
+    cargo clearlydefined --score 50 -t licensed
 
 ## Showing all dependencies
 
