@@ -20,7 +20,7 @@ use std::str::FromStr;
 #[derive(Debug, Clone, Copy, ValueEnum)]
 pub enum OutputFormat {
     Text,
-    CSV,
+    Csv,
     Markdown,
 }
 

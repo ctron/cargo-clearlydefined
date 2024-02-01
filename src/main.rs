@@ -88,11 +88,8 @@ async fn main() -> Result<ExitCode, Error> {
     let mut deps = stream::iter(deps)
         .and_then(|d| cd::lookup_clearlydefined(&client, d))
         .map(|s| {
-            match &s {
-                Ok(dep) => {
-                    log::info!("Processed: {}/{}", dep.name, dep.version);
-                }
-                _ => {}
+            if let Ok(dep) = &s {
+                log::info!("Processed: {}/{}", dep.name, dep.version);
             }
 
             s

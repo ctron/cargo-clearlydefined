@@ -13,15 +13,11 @@
 
 use crate::args::{Args, OutputFormat};
 use crate::data::{Dependency, Outcome};
-
 use anyhow::Result;
-
-use std::io;
-
-use prettytable;
 use prettytable::csv::Writer;
 use prettytable::format::{self, FormatBuilder};
 use prettytable::{Cell, Row, Table};
+use std::io;
 
 const ERR_PREFIX: &str = "ERR: ";
 #[cfg(any(not(windows), not(feature = "win_crlf")))]
@@ -41,7 +37,7 @@ fn clearly_link(dep: &Dependency) -> String {
     )
 }
 
-fn shield_escape(input: &String) -> String {
+fn shield_escape(input: &str) -> String {
     input.replace('-', "--").replace('_', "__")
 }
 
@@ -83,7 +79,7 @@ where
             s.replace(NEWLINE, ERR_PREFIX_NEWLINE)
         }
         OutputFormat::Markdown => format!("<b>ERR:</b> <i>{}</i>", err.to_string()),
-        OutputFormat::CSV => format!("ERR: {}", err.to_string()),
+        OutputFormat::Csv => format!("ERR: {}", err.to_string()),
     }
 }
 
@@ -124,8 +120,9 @@ pub fn show(
 
     titles.push(Cell::new("Score"));
 
+    #[allow(clippy::single_match)]
     match (&format, show_score_check) {
-        (OutputFormat::CSV, true) => titles.push(Cell::new("Score check")),
+        (OutputFormat::Csv, true) => titles.push(Cell::new("Score check")),
         _ => {}
     }
 
@@ -187,13 +184,13 @@ pub fn show(
         // license test column
 
         if show_license_check {
-            match (&format, dep.passed_license) {
-                (OutputFormat::CSV, outcome) => Some(csv(outcome)),
+            if let Some(cell) = match (&format, dep.passed_license) {
+                (OutputFormat::Csv, outcome) => Some(csv(outcome)),
                 (OutputFormat::Text, outcome) => Some(emoji(outcome)),
                 (OutputFormat::Markdown, outcome) => Some(emoji(outcome)),
+            } {
+                row.push(Cell::new(cell))
             }
-            .map(|text| Cell::new(text))
-            .map(|cell| row.push(cell));
         }
 
         // add score
@@ -202,8 +199,9 @@ pub fn show(
 
         // add test column
 
+        #[allow(clippy::single_match)]
         match (&format, show_score_check, dep.passed_score) {
-            (OutputFormat::CSV, true, outcome) => row.push(Cell::new(csv(outcome))),
+            (OutputFormat::Csv, true, outcome) => row.push(Cell::new(csv(outcome))),
             _ => {}
         }
 
@@ -215,7 +213,7 @@ pub fn show(
     // print result
 
     match format {
-        OutputFormat::CSV => {
+        OutputFormat::Csv => {
             table.to_csv_writer(Writer::from_writer(io::stdout()))?;
         }
         OutputFormat::Text => {

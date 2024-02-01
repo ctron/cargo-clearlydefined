@@ -161,6 +161,7 @@ impl LicenseCheck for ApprovedLicenses {
 impl Dependency {
     /// Check if the dependency passed all tests.
     pub fn passed(&self) -> bool {
+        #[allow(clippy::match_like_matches_macro)]
         match (self.passed_score, self.passed_license) {
             (Outcome::Fail, _) => false,
             (_, Outcome::Fail) => false,
@@ -172,7 +173,7 @@ impl Dependency {
     pub fn test_license(
         &self,
         lax: bool,
-        checks: &Vec<Box<dyn LicenseCheck>>,
+        checks: &[Box<dyn LicenseCheck>],
     ) -> Result<(), Vec<anyhow::Error>> {
         let license = match &self.clearly_defined {
             Some(ClearlyDefined {
