@@ -1,6 +1,6 @@
 [package]
 name = "cargo-clearlydefined"
-version = "0.2.2"
+version = "0.3.0"
 authors = ["Jens Reimann <jreimann@redhat.com>"]
 edition = "2021"
 
@@ -13,26 +13,17 @@ readme = "README.md"
 [dependencies]
 
 anyhow = "1.0"
-
 cargo-lock = "9"
-
+clap = { version = "4", features = ["derive"] }
+futures = "0.3.5"
+log = "0.4"
+prettytable-rs = "0.10"
+reqwest = { version = "0.11", features = ["json"] }
 semver = "1"
 serde_json = "1.0"
-
-clap = "2"
-structopt = "0.3"
-
-futures = "0.3.5"
-
-reqwest = { version = "0.11", features = ["json"] }
-tokio = { version = "1", features = ["full"] }
-
-log = "0.4"
 simplelog = "0.12"
-
-prettytable-rs = "0.10"
-
 spdx = "0.10"
+tokio = { version = "1", features = ["full"] }
 
 [features]
 default = ["win_crlf"]

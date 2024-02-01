@@ -16,19 +16,19 @@ mod cd;
 mod data;
 mod report;
 
-use crate::args::Opts;
-use crate::data::{ApprovedLicenses, Dependency, LicenseCheck, OsiApproved, Outcome};
-use anyhow::Error;
-use anyhow::Result;
+use crate::{
+    args::Cli,
+    data::{ApprovedLicenses, Dependency, LicenseCheck, OsiApproved, Outcome},
+};
+use anyhow::{Error, Result};
 use cargo_lock::Lockfile;
-use futures::StreamExt;
-use futures::{stream, TryStreamExt};
+use clap::Parser;
+use futures::{stream, StreamExt, TryStreamExt};
 use log::LevelFilter;
 use simplelog::{ColorChoice, Config, TermLogger, TerminalMode};
 use std::env;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::ExitCode;
-use structopt::StructOpt;
 
 fn default_dir() -> Option<PathBuf> {
     env::var_os("CARGO_MANIFEST_DIR").map(|s| PathBuf::from(&s))
@@ -46,7 +46,7 @@ fn verbosity(num: u8) -> LevelFilter {
 
 #[tokio::main]
 async fn main() -> Result<ExitCode, Error> {
-    let Opts::ClearlyDefined(args) = Opts::from_args();
+    let Cli::Clearlydefined(args) = Cli::parse();
 
     TermLogger::init(
         verbosity(args.verbose),
@@ -55,12 +55,11 @@ async fn main() -> Result<ExitCode, Error> {
         ColorChoice::Auto,
     )?;
 
-    let cwd = env::current_dir()?;
-    let input = args
-        .input
-        .as_ref()
-        .cloned()
-        .unwrap_or_else(|| default_dir().unwrap_or(cwd).join(Path::new("Cargo.lock")));
+    let input = match default_dir() {
+        Some(dir) => dir,
+        None => env::current_dir()?,
+    }
+    .join(&args.input);
 
     log::info!("Loading from: {}", &input.to_str().unwrap_or_default());
 
